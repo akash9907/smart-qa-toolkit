@@ -54,21 +54,24 @@ def generate_pdf_report(kpi, pareto_df, shift_df, date_range, filtered_df):
     elements.append(kpi_table)
     elements.append(Spacer(1, 20))
 
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-    fig.add_bar(x=pareto_df["Defect"], y=pareto_df["Count"], name="Occurrences", marker_color="#4C78A8")
-    fig.add_scatter(x=pareto_df["Defect"], y=pareto_df["Cumulative %"], name="Cumulative %", mode="lines+markers",
-                    line=dict(color="#E45756", width=2), secondary_y=True)
-    fig.add_hline(y=80, line_dash="dash", line_color="gray", secondary_y=True)
-    fig.update_layout(title="Pareto Analysis", xaxis_tickangle=-45, width=700, height=400,
-                      margin=dict(l=60, r=40, t=50, b=120))
-    fig.update_yaxes(title_text="Occurrences", secondary_y=False)
-    fig.update_yaxes(title_text="Cumulative %", range=[0, 105], secondary_y=True)
-
-    img_bytes = fig.to_image(format="png", scale=2, engine="kaleido")
-    img_buffer = io.BytesIO(img_bytes)
-    img = Image(img_buffer, width=500, height=250)
-    elements.append(img)
-    elements.append(Spacer(1, 15))
+        
+    elements.append(Paragraph("<b>Defect Summary Table</b>", styles['Heading2']))
+    
+    summary_data = [["Rank", "Defect Name", "Total Count"]]
+    for _, row in pareto_df.head(10).iterrows():  # Top 10 defects PDF mein
+        summary_data.append([str(row["Rank"]), row["Defect"], str(row["Count"])])
+        
+    summary_table = Table(summary_data, colWidths=[60, 200, 100])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f0f2f6")),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#f9f9f9")])
+    ]))
+    elements.append(summary_table)
+    elements.append(Spacer(1, 20))
 
     elements.append(Paragraph("<b>Top 5 Defects & Action Plan</b>", styles['Heading2']))
     action_plans = filtered_df[["Defect", "Action plan"]].drop_duplicates().groupby("Defect")[
@@ -207,7 +210,7 @@ with st.sidebar:
     source = st.radio("Choose data source", ["Use demo data", "Upload CSV / Excel"])
     st.caption("Required: Date, Line, Model, Shift, Production, Defective Cells, Defect, Count")
     st.divider()
-    # st.caption("V1.6: Fixed Model filtering and layout alignment.")
+   
 
 # ---------------- DEMO DATA ----------------
 

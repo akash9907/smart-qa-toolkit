@@ -64,7 +64,7 @@ def generate_pdf_report(kpi, pareto_df, shift_df, date_range, filtered_df):
     fig.update_yaxes(title_text="Occurrences", secondary_y=False)
     fig.update_yaxes(title_text="Cumulative %", range=[0, 105], secondary_y=True)
 
-    img_bytes = fig.to_image(format="png", scale=2)
+    img_bytes = fig.to_image(format="png", scale=2, engine="kaleido")
     img_buffer = io.BytesIO(img_bytes)
     img = Image(img_buffer, width=500, height=250)
     elements.append(img)

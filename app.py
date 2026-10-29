@@ -14,8 +14,9 @@ st.set_page_config(
     layout="wide"
 )
 
+# UPDATED: "Line" is now "Machine"
 REQUIRED_COLUMNS = [
-    "Date", "Line", "Model", "Shift", "Production", "Defective Cells", "Defect", "Count"
+    "Date", "Machine", "Model", "Shift", "Production", "Defective Cells", "Defect", "Count"
 ]
 OPTIONAL_COLUMNS = ["Action plan"]
 
@@ -54,13 +55,12 @@ def generate_pdf_report(kpi, pareto_df, shift_df, date_range, filtered_df):
     elements.append(kpi_table)
     elements.append(Spacer(1, 20))
 
-        
     elements.append(Paragraph("<b>Defect Summary Table</b>", styles['Heading2']))
-    
+
     summary_data = [["Rank", "Defect Name", "Total Count"]]
     for _, row in pareto_df.head(10).iterrows():  # Top 10 defects PDF mein
         summary_data.append([str(row["Rank"]), row["Defect"], str(row["Count"])])
-        
+
     summary_table = Table(summary_data, colWidths=[60, 200, 100])
     summary_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f0f2f6")),
@@ -114,7 +114,7 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
 
     out["Date"] = pd.to_datetime(out["Date"], errors="coerce", dayfirst=True)
 
-    out["Line"] = out["Line"].astype("string").str.strip().str.upper()
+    out["Machine"] = out["Machine"].astype("string").str.strip().str.upper()
     out["Shift"] = out["Shift"].astype("string").str.strip().str.upper()
     out["Model"] = out["Model"].astype("string").str.strip().str.upper()
     out["Defect"] = out["Defect"].astype("string").str.strip().str.title()
@@ -128,10 +128,10 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     for column in numeric_columns:
         out[column] = pd.to_numeric(out[column], errors="coerce")
 
-    out = out.dropna(subset=["Date", "Line", "Model", "Production", "Defective Cells", "Defect", "Count"])
+    out = out.dropna(subset=["Date", "Machine", "Model", "Production", "Defective Cells", "Defect", "Count"])
 
     out = out[
-        (out["Line"] != "") & (out["Model"] != "") & (out["Shift"] != "")
+        (out["Machine"] != "") & (out["Model"] != "") & (out["Shift"] != "")
         & (out["Defect"] != "") & (out["Production"] > 0)
         & (out["Defective Cells"] >= 0) & (out["Count"] >= 0)
         ].copy()
@@ -144,12 +144,12 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     if (out["Defective Cells"] > out["Production"]).any():
         raise ValueError("Defective Cells cannot be greater than Production.")
 
-    group_keys = ["Date", "Line", "Model", "Shift"]
+    group_keys = ["Date", "Machine", "Model", "Shift"]
 
     grouped = out.groupby(group_keys)[["Production", "Defective Cells"]].nunique()
     if (grouped > 1).any().any():
         raise ValueError(
-            "Production and Defective Cells must have the same values for every Date + Line + Model + Shift combination.")
+            "Production and Defective Cells must have the same values for every Date + Machine + Model + Shift combination.")
 
     defect_totals = out.groupby(group_keys)["Count"].sum().rename("Total Count")
     cell_totals = out.groupby(group_keys)["Defective Cells"].first().rename("Defective Cells")
@@ -158,7 +158,7 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     bad = check[check["Total Count"] > check["Defective Cells"]]
     if not bad.empty:
         raise ValueError("Sum of defect Count exceeds Defective Cells for: " + ", ".join(
-            f"{d} / {l} / {s}" for d, l, s in bad.index.tolist()[:5]) + (" ..." if len(bad) > 5 else ""))
+            f"{d} / {m} / {s}" for d, m, s in bad.index.tolist()[:5]) + (" ..." if len(bad) > 5 else ""))
 
     return out
 
@@ -183,7 +183,7 @@ def pareto_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def calculate_kpis(df: pd.DataFrame) -> dict:
-    prod_data = df.groupby(["Date", "Line", "Model", "Shift"]).agg({
+    prod_data = df.groupby(["Date", "Machine", "Model", "Shift"]).agg({
         "Production": "max",
         "Defective Cells": "max"
     }).reset_index()
@@ -200,7 +200,7 @@ def calculate_kpis(df: pd.DataFrame) -> dict:
 # ---------------- APP HEADER ----------------
 
 st.title("🛡️ Smart QA Toolkit")
-st.caption("Quality Analysis & Defect Summary • V1.0")
+st.caption("Quality Analysis & Defect Summary • V1.7")
 st.info("Developed By Akash")
 
 # ---------------- SIDEBAR ----------------
@@ -208,18 +208,19 @@ st.info("Developed By Akash")
 with st.sidebar:
     st.header("Data source")
     source = st.radio("Choose data source", ["Use demo data", "Upload CSV / Excel"])
-    st.caption("Required: Date, Line, Model, Shift, Production, Defective Cells, Defect, Count")
+    st.caption("Required: Date, Machine, Model, Shift, Production, Defective Cells, Defect, Count")
     st.divider()
-   
 
 # ---------------- DEMO DATA ----------------
 
 demo = pd.DataFrame([
-    {"Date": "2026-10-01", "Line": "A", "Model": "M001", "Shift": "A", "Production": 1000, "Defective Cells": 40,
+    {"Date": "2026-10-01", "Machine": "MCH-01", "Model": "M001", "Shift": "A", "Production": 1000,
+     "Defective Cells": 40,
      "Defect": "Dent", "Count": 15, "Action plan": "Update cooling"},
-    {"Date": "2026-10-01", "Line": "A", "Model": "M002", "Shift": "A", "Production": 1000, "Defective Cells": 40,
+    {"Date": "2026-10-01", "Machine": "MCH-02", "Model": "M002", "Shift": "A", "Production": 1000,
+     "Defective Cells": 40,
      "Defect": "Bubble", "Count": 25, "Action plan": "Calibrate dispenser"},
-    {"Date": "2026-10-02", "Line": "B", "Model": "M001", "Shift": "B", "Production": 800, "Defective Cells": 20,
+    {"Date": "2026-10-02", "Machine": "MCH-01", "Model": "M001", "Shift": "B", "Production": 800, "Defective Cells": 20,
      "Defect": "Wrinkle", "Count": 20, "Action plan": "Adjust tension"},
 ])
 
@@ -251,14 +252,19 @@ if data.empty:
 
 with st.sidebar:
     st.subheader("Filters")
+
+    # NEW: Machine Filter
+    available_machines = sorted(data["Machine"].dropna().unique().tolist())
+    selected_machines = st.multiselect("Select Machines", options=available_machines, default=available_machines)
+
     available_shifts = sorted(data["Shift"].dropna().unique().tolist())
     selected_shifts = st.multiselect("Select Shifts", options=available_shifts, default=available_shifts)
 
     available_models = sorted(data["Model"].dropna().unique().tolist())
     selected_models = st.multiselect("Select Models", options=available_models, default=available_models)
 
-if not selected_shifts or not selected_models:
-    st.warning("Please select at least one shift and one model.")
+if not selected_machines or not selected_shifts or not selected_models:
+    st.warning("Please select at least one machine, shift, and model.")
     st.stop()
 
 st.subheader("Date filter")
@@ -281,14 +287,15 @@ if date_filtered.empty:
     st.warning("No records in the selected date range.")
     st.stop()
 
-# Apply BOTH Shift and Model filters for the main dashboard
+# Apply Machine, Shift, and Model filters for the main dashboard
 filtered = date_filtered[
+    (date_filtered["Machine"].isin(selected_machines)) &
     (date_filtered["Shift"].isin(selected_shifts)) &
     (date_filtered["Model"].isin(selected_models))
     ].copy()
 
 if filtered.empty:
-    st.warning("No records found for the selected shifts/models.")
+    st.warning("No records found for the selected filters.")
     st.stop()
 
 # ---------------- KPIs ----------------
@@ -311,21 +318,21 @@ st.subheader("Comparison Dashboard")
 st.caption("Charts below reflect the **selected filters**.")
 
 # Grouping logic
-group_production = filtered.groupby(["Date", "Line", "Model", "Shift"]).agg(
+group_production = filtered.groupby(["Date", "Machine", "Model", "Shift"]).agg(
     {"Production": "max", "Defective Cells": "max"}).reset_index()
 
 shift_summary = group_production.groupby("Shift", as_index=False).agg(Production=("Production", "sum"),
                                                                       Defective_Cells=("Defective Cells", "sum"))
 shift_summary["Good Cells"] = shift_summary["Production"] - shift_summary["Defective_Cells"]
 shift_summary["Defect Rate (%)"] = (
-            shift_summary["Defective_Cells"].div(shift_summary["Production"].replace(0, pd.NA)) * 100).round(2).fillna(
+        shift_summary["Defective_Cells"].div(shift_summary["Production"].replace(0, pd.NA)) * 100).round(2).fillna(
     0.0)
 
 model_summary = group_production.groupby("Model", as_index=False).agg(Production=("Production", "sum"),
                                                                       Defective_Cells=("Defective Cells", "sum"))
 model_summary["Good Cells"] = model_summary["Production"] - model_summary["Defective_Cells"]
 model_summary["Defect Rate (%)"] = (
-            model_summary["Defective_Cells"].div(model_summary["Production"].replace(0, pd.NA)) * 100).round(2).fillna(
+        model_summary["Defective_Cells"].div(model_summary["Production"].replace(0, pd.NA)) * 100).round(2).fillna(
     0.0)
 
 # Shift Charts
@@ -371,6 +378,22 @@ else:
 
 fig_model_defect.update_layout(xaxis_tickangle=-45, margin=dict(b=100))
 st.plotly_chart(fig_model_defect, width="stretch")
+
+# Defect Breakdown Chart (Machine-wise)
+st.markdown("### Machine-wise Defect Breakdown")
+machine_defects = filtered.groupby(["Machine", "Defect"], as_index=False)["Count"].sum()
+
+machine_chart_type = st.radio("Select machine chart view:", ["Defect by Machine", "Machine by Defect"], horizontal=True, key="machine_radio")
+
+if machine_chart_type == "Defect by Machine":
+    fig_machine_defect = px.bar(machine_defects, x="Machine", y="Count", color="Defect", barmode="stack",
+                              title="Defect Categories per Machine")
+else:
+    fig_machine_defect = px.bar(machine_defects, x="Defect", y="Count", color="Machine", barmode="group",
+                              title="Machines per Defect Category")
+
+fig_machine_defect.update_layout(xaxis_tickangle=-45, margin=dict(b=100))
+st.plotly_chart(fig_machine_defect, width="stretch")
 
 # ---------------- DEFECT SUMMARY ----------------
 
@@ -447,7 +470,7 @@ st.dataframe(p, width="stretch", hide_index=True)
 # ---------------- DEFECT RECORDS & EXPORT ----------------
 
 st.subheader("Defect Records")
-cols_order = ["Date", "Line", "Model", "Shift", "Production", "Defective Cells", "Defect", "Count", "Action plan"]
+cols_order = ["Date", "Machine", "Model", "Shift", "Production", "Defective Cells", "Defect", "Count", "Action plan"]
 display_df = filtered[[c for c in cols_order if c in filtered.columns]].sort_values("Date", ascending=False)
 
 st.dataframe(

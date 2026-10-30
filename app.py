@@ -224,11 +224,11 @@ if source == "Upload CSV / Excel":
 else:
     # Fallback Demo Data
     demo_data = pd.DataFrame([
-        {"Date": "2026-10-01", "Machine": "MCH-01", "Model": "M001", "Shift": "A", "Production": 1000,
+        {"Date": "2026-10-01", "Machine": "AWIN1", "Model": "M001", "Shift": "A", "Production": 1000,
          "Defective Cells": 40, "Defect": "Dent", "Count": 15, "Action plan": "Update cooling"},
-        {"Date": "2026-10-01", "Machine": "MCH-02", "Model": "M002", "Shift": "A", "Production": 1000,
+        {"Date": "2026-10-01", "Machine": "AWIN2", "Model": "M002", "Shift": "A", "Production": 1000,
          "Defective Cells": 40, "Defect": "Bubble", "Count": 25, "Action plan": "Calibrate dispenser"},
-        {"Date": "2026-10-02", "Machine": "MCH-01", "Model": "M001", "Shift": "B", "Production": 800,
+        {"Date": "2026-10-02", "Machine": "AWIN3", "Model": "M001", "Shift": "B", "Production": 800,
          "Defective Cells": 20, "Defect": "Wrinkle", "Count": 20, "Action plan": "Adjust tension"},
     ])
     df = clean_and_validate_data(demo_data)
@@ -427,8 +427,8 @@ with p_right:
 if not pareto_df.empty and pareto_df["Cumulative %"].max() >= 80:
     vital_few = pareto_df[pareto_df["Cumulative %"] <= 80]
     vital_count = len(vital_few) + 1 if len(vital_few) < len(pareto_df) else len(vital_few)
-    st.info(
-        f"💡 **80/20 Insight:** Just **{vital_count} out of {len(pareto_df)} defect categories** are responsible for **80% of all defects**.")
+    # st.info(
+    #     f"💡 **80/20 Insight:** Just **{vital_count} out of {len(pareto_df)} defect categories** are responsible for **80% of all defects**.")
 else:
     st.info("💡 All defect categories are required to reach 80% of occurrences.")
 
@@ -440,13 +440,44 @@ st.dataframe(pareto_df, width="stretch", hide_index=True)
 
 st.divider()
 st.subheader("Defect Records")
+# st.caption("💡 **Tip:** Kisi bhi row par click karein aur us defect ka poora Action Plan neeche dekhein.")
+
 cols_order = ["Date", "Machine", "Model", "Shift", "Production", "Defective Cells", "Defect", "Count", "Action plan"]
 display_df = filtered_df[[c for c in cols_order if c in filtered_df.columns]].sort_values("Date", ascending=False)
 
-st.dataframe(
-    display_df, width="stretch", hide_index=True,
-    column_config={"Action plan": st.column_config.TextColumn("Action Plan", width="large")}
+# Reset index taaki click karne par sahi row ka data mile
+display_df = display_df.reset_index(drop=True)
+
+# Dataframe with row selection enabled
+event = st.dataframe(
+    display_df,
+    width="stretch",
+    hide_index=True,
+    on_select="rerun",
+    selection_mode="single-row",
+    column_config={
+        "Action plan": st.column_config.TextColumn(
+            "Action Plan",
+            help="Click on the row to view full text below",
+            width="medium"  # Chhota kar diya taaki table screen par fit ho jaye
+        )
+    }
 )
+
+# Agar user ne koi row select ki hai, toh uska poora Action Plan dikhao
+if event.selection and event.selection.rows:
+    selected_idx = event.selection.rows[0]
+    selected_row = display_df.iloc[selected_idx]
+
+    st.info(
+        f"**Selected Defect Details:**\n\n"
+        f"**Date:** {selected_row['Date'].strftime('%Y-%m-%d')} | "
+        f"**Machine:** {selected_row['Machine']} | "
+        f"**Model:** {selected_row['Model']} | "
+        f"**Defect:** {selected_row['Defect']}\n\n"
+        f"**Full Action Plan:**\n\n"
+        f"{selected_row['Action plan']}"
+    )
 
 st.subheader("Export Data")
 c_exp1, c_exp2, c_exp3 = st.columns(3)
